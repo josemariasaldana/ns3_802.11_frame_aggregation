@@ -17,9 +17,9 @@ Author's self-archive version: http://diec.unizar.es/~jsaldana/personal/amsterda
 
 ## Content of the repository
 
-The .cc file contains the ns3 script. It has been run with ns3-26.
+The `.cc` file contains the ns3 script. It has been run with ns3-26 (https://www.nsnam.org/ns-3-26/).
 
-The folder "shell_scripts_used_in_the_paper" contains the files used for obtaining each of
+The folder `shell_scripts_used_in_the_paper` contains the files used for obtaining each of
 the figures presented in the paper.
 
 
@@ -27,8 +27,8 @@ the figures presented in the paper.
 
 - Download ns3.
 
-- Put the `.cc` file in the "ns-3.26/scratch" directory.
+- Put the `.cc` file in the `ns-3.26/scratch` directory.
 
-- Put a .sh file in the "ns-3.26" directory.
+- Put a `.sh` file in the `ns-3.26` directory.
 
-- Run a .sh file. (You may need to adjust the name of the .cc file in the .sh script).
+- Run a `.sh` file. (You may need to adjust the name of the `.cc` file in the `.sh` script).
