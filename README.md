@@ -3,6 +3,7 @@ ns3 scripts for simulating scenarios in which 802.11 frame aggregation is studie
 
 ## Citation
 If you use this code, please cite the next research article:
+
 Jose Saldana, Jose Ruiz-Mas, Jose Almodovar, "Frame Aggregation in Central Controlled
 802.11 WLANs: the Latency vs. Throughput Trade-off," IEEE Communications Letters,
 accepted for publication, August 2017.
@@ -10,6 +11,7 @@ http://dx.doi.org/10.1109/LCOMM.2017.2741940
 (the citation will be updated as soon as the paper is published in paper)
 
 http://ieeexplore.ieee.org/document/8013762/
+
 Author's self-archive version: http://diec.unizar.es/~jsaldana/personal/amsterdam_2017_in_proc.pdf
 
 
@@ -25,7 +27,7 @@ the figures presented in the paper.
 
 - Download ns3.
 
-- Put the .cc file in the "ns-3.26/scratch" directory.
+- Put the `.cc` file in the "ns-3.26/scratch" directory.
 
 - Put a .sh file in the "ns-3.26" directory.
 
