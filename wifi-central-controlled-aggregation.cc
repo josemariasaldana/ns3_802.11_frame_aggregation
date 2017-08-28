@@ -9,7 +9,11 @@
  * Jose Saldana, Jose Ruiz-Mas, Jose Almodovar, "Frame Aggregation in Central Controlled
  * 802.11 WLANs: the Latency vs. Throughput Trade-off," IEEE Communications Letters,
  * accepted for publication, August 2017.
- * FIXME: (the citation will be updated as soon as the paper has a doi)
+ * http://dx.doi.org/10.1109/LCOMM.2017.2741940
+ * FIXME: (the citation will be updated as soon as the paper is published in paper)
+ *
+ * http://ieeexplore.ieee.org/document/8013762/
+ * Author's self-archive version: http://diec.unizar.es/~jsaldana/personal/amsterdam_2017_in_proc.pdf
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -30,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v138
+ * v139
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
