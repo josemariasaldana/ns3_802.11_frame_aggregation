@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v141
+ * v140
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -229,7 +229,7 @@ using namespace ns3;
 // Exp can range from 0 to 7, this yields A-MPDU to be of length:
 // - 2^13 - 1 = 8191 (8KB)
 // - 2^20 - 1 = 1,048,575 (about 1MB)
-#define MAXSIZE80211ac 65535 // FIXME https://www.nsnam.org/doxygen/classns3_1_1_sta_wifi_mac.html
+#define MAXSIZE80211ac 1000000
 
 // Define a log component
 NS_LOG_COMPONENT_DEFINE ("SimpleMpduAggregation");
