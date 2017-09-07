@@ -1,6 +1,7 @@
 # ns3_802.11_frame_aggregation
 ns3 scripts for simulating scenarios in which 802.11 frame aggregation is studied
 
+
 ## Citation
 If you use this code, please cite the next research article:
 
@@ -13,6 +14,8 @@ http://dx.doi.org/10.1109/LCOMM.2017.2741940
 http://ieeexplore.ieee.org/document/8013762/
 
 Author's self-archive version: http://diec.unizar.es/~jsaldana/personal/amsterdam_2017_in_proc.pdf
+
+wifi-central-controlled-aggregation_v140.cc is the ns3 file used for the paper.
 
 
 ## Content of the repository

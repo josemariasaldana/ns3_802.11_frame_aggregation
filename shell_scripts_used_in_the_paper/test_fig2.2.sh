@@ -22,7 +22,7 @@ for ((i=INIT_NUM_TCP_USERS; i<=UPPER_LIMIT_NUM_TCP_USERS; i=$((${i}+${STEP_NUM_T
 
     echo "$INIT_FILE_NAME $(date) seed: $seed. number of TCP download users $NUMBER_TCP_USERS. number VoIP upload users $NUMBER_VOIP_USERS. Starting..."
     NS_GLOBAL_VALUE="RngRun=$seed" ./waf -d optimized --run \
-	"scratch/wifi-central-controlled-aggregation_v139 \
+	"scratch/wifi-central-controlled-aggregation_v140 \
 	--simulationTime=600 \
 	--numberVoIPupload=$NUMBER_VOIP_USERS \
 	--numberVoIPdownload=0 \
