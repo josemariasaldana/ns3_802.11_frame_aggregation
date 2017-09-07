@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v141
+ * v142
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -229,10 +229,14 @@ using namespace ns3;
 // Exp can range from 0 to 7, this yields A-MPDU to be of length:
 // - 2^13 - 1 = 8191 (8KB)
 // - 2^20 - 1 = 1,048,575 (about 1MB)
-#define MAXSIZE80211ac 65535 // FIXME https://www.nsnam.org/doxygen/classns3_1_1_sta_wifi_mac.html
+#define MAXSIZE80211ac 65535 // FIXME. Should this be 1000000? https://www.nsnam.org/doxygen/classns3_1_1_sta_wifi_mac.html
 
 // Define a log component
 NS_LOG_COMPONENT_DEFINE ("SimpleMpduAggregation");
+
+
+// FIXME. Global variable
+bool AddOperationalChannelIsWorking = true;
 
 
 /********* FUNCTIONS ************/
@@ -1474,39 +1478,70 @@ STA_record::UnsetAssoc (std::string context, Mac48Address AP_MAC_address)
     ListAPs (staRecordVerboseLevel);
   }
 
-  // Put the STA in the channel of the nearest AP
-  if (staRecordNumChannels > 1) {
-    // Only for wifiModel = 0. With WifiModel = 1 it is supposed to scan for other APs in other channels 
-    //if (staRecordwifiModel == 0) {
-      // Put all the APs in a nodecontainer
-      // and get a pointer to the STA
-      Ptr<Node> mySTA;
-      NodeContainer APs;
-      uint32_t numberAPs = CountAPs (staRecordVerboseLevel);
 
-      for (NodeList::Iterator i = NodeList::Begin(); i != NodeList::End(); ++i) {
-        uint32_t identif;
-        identif = (*i)->GetId();
-     
-        if ( (identif >= 0) && (identif < numberAPs) ) {
-          APs.Add(*i);
-        } else if ( identif == staid) {
-          mySTA = (*i);
+  // If wifiModel==1, I don't need to manually change the channel. It will do it automatically
+  // If wifiModel==0, I have to manually set the channel of the STA to that of the nearest AP
+  if (staRecordwifiModel == 0) {  // staRecordwifiModel is the local version of the variable wifiModel
+    // Put the STA in the channel of the nearest AP
+    if (staRecordNumChannels > 1) {
+      // Only for wifiModel = 0. With WifiModel = 1 it is supposed to scan for other APs in other channels 
+      //if (staRecordwifiModel == 0) {
+        // Put all the APs in a nodecontainer
+        // and get a pointer to the STA
+        Ptr<Node> mySTA;
+        NodeContainer APs;
+        uint32_t numberAPs = CountAPs (staRecordVerboseLevel);
+
+        for (NodeList::Iterator i = NodeList::Begin(); i != NodeList::End(); ++i) {
+          uint32_t identif;
+          identif = (*i)->GetId();
+       
+          if ( (identif >= 0) && (identif < numberAPs) ) {
+            APs.Add(*i);
+          } else if ( identif == staid) {
+            mySTA = (*i);
+          }
         }
-      }
 
-      // Find the nearest AP
-      Ptr<Node> nearest;
-      nearest = nearestAp (APs, mySTA, staRecordVerboseLevel);
+        // Find the nearest AP
+        Ptr<Node> nearest;
+        nearest = nearestAp (APs, mySTA, staRecordVerboseLevel);
 
-      // Move this STA to the channel of the AP identified as the nearest one
-      NetDeviceContainer thisDevice;
-      thisDevice.Add( (mySTA)->GetDevice(1) ); // this adds the device to the NetDeviceContainer. It has to be device 1, not device 0. I don't know why
-   
-      uint8_t newChannel = GetAP_WirelessChannel ( (nearest)->GetId(), staRecordVerboseLevel );
+        // Move this STA to the channel of the AP identified as the nearest one
+        NetDeviceContainer thisDevice;
+        thisDevice.Add( (mySTA)->GetDevice(1) ); // this adds the device to the NetDeviceContainer. It has to be device 1, not device 0. I don't know why
+     
+        uint8_t newChannel = GetAP_WirelessChannel ( (nearest)->GetId(), staRecordVerboseLevel );
 
-      ChangeFrequencyLocal (thisDevice, newChannel, staRecordwifiModel, staRecordVerboseLevel); 
-    //}
+        ChangeFrequencyLocal (thisDevice, newChannel, staRecordwifiModel, staRecordVerboseLevel);
+
+        if (staRecordVerboseLevel > 0)
+          std::cout << Simulator::Now () 
+                    << "\t[UnsetAssoc] Channel in STA #" << staid 
+                    << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
+                    << "\twith MAC " << apMac
+                    << "\tset to " << newChannel 
+                    << std::endl;
+      //}
+    } else { // numChannels == 1
+      if (staRecordVerboseLevel > 0)
+        std::cout << Simulator::Now () 
+                  << "\t[UnsetAssoc] Channel in STA #" << staid 
+                  << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
+                  << "\twith MAC " << apMac
+                  << "\tnot modified because numChannels=" << staRecordNumChannels 
+                  << "\tchannel is still " << uint16_t (apChannel) 
+                  << std::endl;
+    }
+  } else { // wifiModel = 1
+    if (staRecordVerboseLevel > 0)
+      std::cout << Simulator::Now () 
+                  << "\t[UnsetAssoc] Channel in STA #" << staid 
+                  << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
+                  << "\twith MAC " << apMac
+                  << "\tnot modified because wifimodel=" << staRecordwifiModel
+                  << "\tchannel is still " << uint16_t (apChannel) 
+                  << std::endl;
   }
 }
 
@@ -1719,6 +1754,8 @@ int main (int argc, char *argv[]) {
 
   uint32_t numChannels = 4; // by default, 4 different channels are used in the APs
 
+  uint32_t channelWidth = 20;
+
   // https://www.nsnam.org/doxygen/wifi-spectrum-per-example_8cc_source.html
   uint32_t wifiModel = 0;
 
@@ -1760,9 +1797,13 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("numberVoIPdownload", "Number of nodes running VoIP down", numberVoIPdownload);
   cmd.AddValue ("numberTCPupload", "Number of nodes running TCP up", numberTCPupload);
   cmd.AddValue ("numberTCPdownload", "Number of nodes running TCP down", numberTCPdownload);
-
   cmd.AddValue ("prioritiesEnabled", "Use different 802.11 priorities for VoIP / TCP (0: no, default; 1: yes)", prioritiesEnabled);
+
   cmd.AddValue ("version80211", "Version of 802.11 (0: 802.11n; 1: 802.11ac)", version80211);
+  cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
+  cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
+  cmd.AddValue ("wifiModel", "WiFi model: 0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel (DO NOT USE OPTION 1)", wifiModel); // FIXME
+
   cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
 //cmd.AddValue ("enableRtsCts", "Enable RTS/CTS? 0: no (default); 1: yes; 2: only for packets above 500 bytes", enableRtsCts);
   cmd.AddValue ("RtsCtsThreshold", "Threshold for using RTS/CTS (bytes). Examples. 0: always; 500: only 500 bytes-packes or higher will require RTS/CTS; 999999: never (default)", RtsCtsThreshold);
@@ -1777,8 +1818,6 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("outputFileSurname", "Other characters to be used in the name of the output files (not in the average one)", outputFileSurname);
   cmd.AddValue ("saveXMLFile", "Save per-flow results to an XML file?", saveXMLFile);
 
-  cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
-  cmd.AddValue ("wifiModel", "WiFi model: 0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel (DO NOT USE OPTION 1)", wifiModel); // FIXME
   cmd.AddValue ("topology", "Topology: (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router)", topology);
 
   cmd.Parse (argc, argv);
@@ -1790,9 +1829,17 @@ int main (int argc, char *argv[]) {
   double y_position_first_STA = y_position_first_AP + y_distance_STA_to_AP; // by default, the first STA is located some meters above the first AP
   uint32_t number_of_Servers = number_of_STAs;  // the number of servers is the same as the number of STAs. Each server attends a STA
 
-  //the list of 20MHz channels is here: https://www.nsnam.org/docs/models/html/wifi-user.html
-  uint8_t availableChannels[16] = {36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128}; // see https://en.wikipedia.org/wiki/List_of_WLAN_channels
-  //uint8_t availableChannels[16] = {104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 161, 165, 169}; // see https://en.wikipedia.org/wiki/List_of_WLAN_channels
+  //the list of channels is here: https://www.nsnam.org/docs/models/html/wifi-user.html
+  // see https://en.wikipedia.org/wiki/List_of_WLAN_channels
+  uint8_t availableChannels20MHz[34] = {36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112,
+                                        116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 
+                                        161, 165, 169, 173, 184, 188, 192, 196, 8, 12, 16};
+
+  uint8_t availableChannels40MHz[12] = {38, 46, 54, 62, 102, 110, 118, 126, 134, 142, 151, 159}; 
+
+  uint8_t availableChannels80MHz[6] = {42, 58, 106, 122, 138, 155}; 
+
+  uint8_t availableChannels160MHz[2] = {50, 114};
 
   uint32_t i, j;  //FIXME: remove these variables and declare them when needed
 
@@ -1845,12 +1892,43 @@ int main (int argc, char *argv[]) {
     return 0;
   }
 
-  if ((numChannels != 1) && (numChannels != 4) && (numChannels != 9) && (numChannels != 16)) {
-    std::cout << "INPUT PARAMETER ERROR: The number of channels has to be 1, 4, 9 or 16. Stopping the simulation." << '\n';
+  // check if the channel width is correct
+  if ((channelWidth != 20) && (channelWidth != 40) && (channelWidth != 80) && (channelWidth != 160)) {
+    std::cout << "INPUT PARAMETER ERROR: The witdth of the channels has to be 20, 40, 80 or 160. Stopping the simulation." << '\n';
     return 0;    
   }
 
+  if ((channelWidth == 20) && (numChannels > 34) ) {
+    std::cout << "INPUT PARAMETER ERROR: The maximum number of 20 MHz channels is 16. Stopping the simulation." << '\n';
+    return 0;    
+  }
 
+  if ((channelWidth == 40) && (numChannels > 12) ) {
+    std::cout << "INPUT PARAMETER ERROR: The maximum number of 40 MHz channels is 12. Stopping the simulation." << '\n';
+    return 0;    
+  }
+
+  if ((channelWidth == 80) && (numChannels > 6) ) {
+    std::cout << "INPUT PARAMETER ERROR: The maximum number of 80 MHz channels is 6. Stopping the simulation." << '\n';
+    return 0;    
+  }
+
+  if ((channelWidth == 160) && (numChannels > 2) ) {
+    std::cout << "INPUT PARAMETER ERROR: The maximum number of 160 MHz channels is 12. Stopping the simulation." << '\n';
+    return 0;    
+  }
+
+  uint8_t availableChannels[numChannels];
+  for (uint32_t i = 0; i < numChannels; ++i) {
+    if (channelWidth == 20)
+      availableChannels[i] = availableChannels20MHz[i];
+    else if (channelWidth == 40)
+      availableChannels[i] = availableChannels40MHz[i];
+    else if (channelWidth == 80)
+      availableChannels[i] = availableChannels80MHz[i];
+    else if (channelWidth == 160)
+      availableChannels[i] = availableChannels160MHz[i];
+  }
 
   // Show the parameters by the screen
   if (verboseLevel > 0) {
@@ -1873,8 +1951,8 @@ int main (int argc, char *argv[]) {
     //std::cout << '\n'; 
     std::cout << "Initial rate of APs with AMPDU aggregation enabled: " << rateAPsWithAMPDUenabled << '\n';
     std::cout << "Is the algorithm controlling AMPDU aggregation enabled?: " << aggregationAlgorithm << '\n';
-    std::cout << "Maximum value of the AMPDU (bytes): " << maxAmpduSize << '\n';
-    std::cout << "Max AMPDU size to use when aggregation is disabled: " << maxAmpduSizeWhenAggregationDisabled << '\n';
+    std::cout << "Maximum value of the AMPDU size: " << maxAmpduSize << " bytes" << '\n';
+    std::cout << "Maximum value of the AMPDU size when aggregation is disabled: " << maxAmpduSizeWhenAggregationDisabled << " bytes" << '\n';
     //std::cout << '\n'; 
     std::cout << "TCP Payload size: " << TcpPayloadSize << " bytes"  << '\n';
     std::cout << "TCP variant: " << TcpVariant << '\n';
@@ -1884,28 +1962,42 @@ int main (int argc, char *argv[]) {
     std::cout << "Number of nodes running VoIP down: " << numberVoIPdownload << '\n';
     std::cout << "Number of nodes running TCP up: " << numberTCPupload << '\n';
     std::cout << "Number of nodes running TCP down: " << numberTCPdownload << '\n';
-    //std::cout << '\n';    
     std::cout << "Use different 802.11 priorities for VoIP / TCP? (0: no, default; 1: yes): " << prioritiesEnabled << '\n';
+    //std::cout << '\n'; 
     std::cout << "Version of 802.11 (0: 802.11n; 1: 802.11ac): " << version80211 << '\n';
-    std::cout << "Model for 802.11 rate control (Constant; Ideal, default; Minstrel): " << rateModel << '\n';  
-  //std::cout << "Enable RTS/CTS? 0: no (default); 1: yes; 2: only for packets above 500 bytes: " << enableRtsCts << '\n';
-    std::cout << "Threshold for using RTS/CTS (bytes): " << RtsCtsThreshold << '\n';
-    std::cout << "Power level of the wireless interfaces: " << powerLevel << '\n';
+    std::cout << "Number of different channels to use on the APs: " << numChannels << '\n';
+    std::cout << "Channels being used: ";
+    for (uint32_t i = 0; i < numChannels; ++i) {
+      std::cout << uint16_t (availableChannels[i]) << " ";
+    }
+    std::cout << '\n'; 
+    std::cout << "Width of the wireless channels: " << channelWidth << '\n';
+    std::cout << "WiFi model (0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel): " << wifiModel << '\n';
+    //std::cout << '\n';
+    std::cout << "Model for 802.11 rate control (Constant; Ideal (default); Minstrel): " << rateModel << '\n';  
+    std::cout << "Threshold for using RTS/CTS (Examples. 0:always; 500:only 500 bytes-packes or higher will require RTS/CTS; 999999:never): " << RtsCtsThreshold << " bytes" << '\n';
+    std::cout << "Power level of the wireless interfaces (ranges between 0 and 1): " << powerLevel << '\n';
     //std::cout << '\n';
     std::cout << "pcap generation enabled ?: " << enablePcap << '\n';
     std::cout << "verbose level: " << verboseLevel << '\n';
-    std::cout << "Periodically print simulation time: " << printSeconds << '\n';    
+    std::cout << "Periodically print simulation time every " << printSeconds << " seconds" << '\n';    
     std::cout << "Generate histograms (delay, jitter, packet size): " << generateHistograms << '\n';
     std::cout << "First characters to be used in the name of the output file: " << outputFileName << '\n';
     std::cout << "Other characters to be used in the name of the output file (not in the average one): " << outputFileSurname << '\n';
     std::cout << "Save per-flow results to an XML file?: " << saveXMLFile << '\n';
     //std::cout << '\n'; 
-    std::cout << "Number of different channels to use on the APs: " << numChannels << '\n';
-    std::cout << "WiFi model (0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel): " << wifiModel << '\n';
     std::cout << "Topology (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router): " << topology << '\n';
 
     //std::cout << '\n'; 
     std::cout << '\n';
+
+
+    //FIXME
+    if (wifiModel == 1 && numChannels > 1) {
+      AddOperationalChannelIsWorking = true;
+      std::cout << "####### the function AddOperationalChannel is working" << '\n'; 
+      std::cout << '\n';      
+    }
   }
 
 
@@ -2029,7 +2121,7 @@ int main (int argc, char *argv[]) {
 
 
   if (verboseLevel > 2) {
-    for (i = 0; i < number_of_APs; ++i) {
+    for (uint32_t i = 0; i < number_of_APs; ++i) {
       //ReportPosition (backboneNodes.Get(i), i, 0, 1, apNodes); this would report the position every second
       //Vector pos = GetPosition (backboneNodes.Get (i));
       Vector pos = GetPosition (apNodes.Get (i));
@@ -2304,18 +2396,20 @@ int main (int argc, char *argv[]) {
       //                          with '-10' the coverage is about 70 m (recommended for an array with distance 50m between APs)
 
       wifiPhy.Set ("ShortGuardEnabled", BooleanValue (false));
-      wifiPhy.Set ("ChannelWidth", UintegerValue (20));
+      wifiPhy.Set ("ChannelWidth", UintegerValue (channelWidth));
     //wifiPhy.Set ("ChannelNumber", UintegerValue(ChannelNo)); //This is done later
     }
     wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
-//QUESTION: Can this be done with YANS?
-/*Ptr<wifiPhy> myphy = node->GetObject<wifiPhy> ()
-  wifiPhy.AddOperationalChannel ( UintegerValue(36) );
-  wifiPhy.AddOperationalChannel ( UintegerValue(40) );
-  wifiPhy.AddOperationalChannel ( UintegerValue(44) );
-  wifiPhy.AddOperationalChannel ( UintegerValue(48) );
+
+    //FIXME: Can this be done with YANS?
+
+    //Ptr<wifiPhy> myphy = node->GetObject<wifiPhy> ();
+/*    if (numChannels > 1) 
+      for (uint32_t k = 0; k < numChannels; k++)
+        wifiPhy.AddOperationalChannel ( availableChannels[k] );
 */
 
+  // wifiModel == 1
   } else {
 
     //Bug 2460: CcaMode1Threshold default should be set to -62 dBm when using Spectrum
@@ -2336,7 +2430,7 @@ int main (int argc, char *argv[]) {
     spectrumPhy.Set ("TxPowerEnd", DoubleValue (1));
 
     spectrumPhy.Set ("ShortGuardEnabled", BooleanValue (false));
-    spectrumPhy.Set ("ChannelWidth", UintegerValue (20));
+    spectrumPhy.Set ("ChannelWidth", UintegerValue (channelWidth));
 
     Ptr<SpectrumWifiPhy> m_phy;
     m_phy = CreateObject<SpectrumWifiPhy> ();
@@ -2349,10 +2443,9 @@ int main (int argc, char *argv[]) {
     // https://groups.google.com/forum/#!topic/ns-3-users/Ih8Hgs2qgeg
 
     // This does not work, i.e. the STA does not scan in other channels
-    if (numChannels > 1)
-      if (wifiModel == 1)
-        for (uint32_t k = 0; k < numChannels; k++)
-          (*m_phy).AddOperationalChannel ( availableChannels[k] );
+    if (numChannels > 1) 
+      for (uint32_t k = 0; k < numChannels; k++)
+        (*m_phy).AddOperationalChannel ( availableChannels[k] );
   }
 
 
@@ -2496,113 +2589,8 @@ int main (int argc, char *argv[]) {
     // install the wifi in the APs
     uint8_t ChannelNoForThisAP = availableChannels[0];
 
-    // obtain the row and the column number of this AP
-    uint32_t rowThisAp, columnThisAp;
-
-    rowThisAp = i / number_of_APs_per_row;
-    columnThisAp = i % number_of_APs_per_row;
-
-    if (verboseLevel > 2) {
-      std::cout << "row " << rowThisAp << '\n';
-      std::cout << "column " << rowThisAp << '\n';
-    }
-
-    // If all the APs are in the same channel
-    if ( numChannels == 1 ) {
-      ChannelNoForThisAP = availableChannels[0];
-    }
-
-    else if ( numChannels == 4 ) {
-      // this is the structure    44  48 | 44  48
-      //                          36  40 | 36  40
-      //                          -------+-------
-      //                          44  48 | 44  48
-      //                          36  40 | 36  40
-
-      if ((rowThisAp % 2) == 0) {
-        if ((columnThisAp % 2) == 0) {
-          ChannelNoForThisAP = availableChannels[0];
-        } else {
-          ChannelNoForThisAP = availableChannels[1];
-        }
-      } else {
-        if ((columnThisAp % 2) == 0) {
-          ChannelNoForThisAP = availableChannels[2];
-        } else {
-          ChannelNoForThisAP = availableChannels[3];
-        }        
-      }
-
-    } else if (numChannels == 9) {
-      if ((rowThisAp % 3) == 0) {
-        if ((columnThisAp % 3) == 0) {
-          ChannelNoForThisAP = availableChannels[0];
-        } else if ((columnThisAp % 3) == 1) {
-          ChannelNoForThisAP = availableChannels[1];
-        } else {
-          ChannelNoForThisAP = availableChannels[2];          
-        }
-      } else if ((rowThisAp % 3) == 1) {
-        if ((columnThisAp % 3) == 0) {
-          ChannelNoForThisAP = availableChannels[3];
-        } else if ((columnThisAp % 3) == 1) {
-          ChannelNoForThisAP = availableChannels[4];
-        } else {
-          ChannelNoForThisAP = availableChannels[5];          
-        }       
-      } else {
-        if ((columnThisAp % 3) == 0) {
-          ChannelNoForThisAP = availableChannels[6];
-        } else if ((columnThisAp % 3) == 1) {
-          ChannelNoForThisAP = availableChannels[7];
-        } else {
-          ChannelNoForThisAP = availableChannels[8];        
-        }        
-      }
-
-    } else if (numChannels == 16) {
-      if ((rowThisAp % 4) == 0) {
-        if ((columnThisAp % 4) == 0) {
-          ChannelNoForThisAP = availableChannels[0];
-        } else if ((columnThisAp % 4) == 1) {
-          ChannelNoForThisAP = availableChannels[1];
-        } else if ((columnThisAp % 4) == 2) {
-          ChannelNoForThisAP = availableChannels[2];
-        } else {
-          ChannelNoForThisAP = availableChannels[3];          
-        }
-      } else if ((rowThisAp % 4) == 1) {
-        if ((columnThisAp % 4) == 0) {
-          ChannelNoForThisAP = availableChannels[4];
-        } else if ((columnThisAp % 4) == 1) {
-          ChannelNoForThisAP = availableChannels[5];
-        } else if ((columnThisAp % 4) == 2) {
-          ChannelNoForThisAP = availableChannels[6];
-        } else {
-          ChannelNoForThisAP = availableChannels[7];          
-        }       
-      } else if ((rowThisAp % 4) == 2) {
-        if ((columnThisAp % 4) == 0) {
-          ChannelNoForThisAP = availableChannels[8];
-        } else if ((columnThisAp % 4) == 1) {
-          ChannelNoForThisAP = availableChannels[9];
-        } else if ((columnThisAp % 4) == 2) {
-          ChannelNoForThisAP = availableChannels[10];
-        } else {
-          ChannelNoForThisAP = availableChannels[11];          
-        }       
-      } else {
-        if ((columnThisAp % 4) == 0) {
-          ChannelNoForThisAP = availableChannels[12];
-        } else if ((columnThisAp % 4) == 1) {
-          ChannelNoForThisAP = availableChannels[13];
-        } else if ((columnThisAp % 4) == 2) {
-          ChannelNoForThisAP = availableChannels[14];
-        } else {
-          ChannelNoForThisAP = availableChannels[15];          
-        }      
-      }
-    }
+    // Use the available channels in turn
+    ChannelNoForThisAP = availableChannels[i % numChannels];
 
     // Yans wifi
     if (wifiModel == 0) {    
@@ -2787,11 +2775,9 @@ int main (int argc, char *argv[]) {
     }
   }
 
-  if (version80211 == 1) { // 802.11ac
-    int channelWidth = 20;
-    // Set channel width
-    Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (channelWidth));
-  }
+  // Set channel width
+  Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (channelWidth));
+
 
 
   // wired connections
@@ -3407,7 +3393,9 @@ int main (int argc, char *argv[]) {
   // it will send traffic to the STAs
   ApplicationContainer BulkSendTcpDown;
 
-  for (uint32_t i = numberVoIPupload + numberVoIPdownload + numberTCPupload; i < numberVoIPupload + numberVoIPdownload + numberTCPupload + numberTCPdownload; i++) {
+  for (uint32_t i = numberVoIPupload + numberVoIPdownload + numberTCPupload; 
+                i < numberVoIPupload + numberVoIPdownload + numberTCPupload + numberTCPdownload; 
+                i++) {
 
     // Install a sink on each STA
     // Each sink will have a different port
