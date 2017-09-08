@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v142
+ * v143
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -229,14 +229,13 @@ using namespace ns3;
 // Exp can range from 0 to 7, this yields A-MPDU to be of length:
 // - 2^13 - 1 = 8191 (8KB)
 // - 2^20 - 1 = 1,048,575 (about 1MB)
-#define MAXSIZE80211ac 65535 // FIXME. Should this be 1000000? https://www.nsnam.org/doxygen/classns3_1_1_sta_wifi_mac.html
+#define MAXSIZE80211ac 65535  // FIXME. for 802.11ac max ampdu size should be 4692480
+                              // You can set it in src/wifi/regular-wifi-mac.cc
+                              // http://chimera.labs.oreilly.com/books/1234000001739/ch03.html
+                              // https://www.nsnam.org/doxygen/classns3_1_1_sta_wifi_mac.html
 
 // Define a log component
 NS_LOG_COMPONENT_DEFINE ("SimpleMpduAggregation");
-
-
-// FIXME. Global variable
-bool AddOperationalChannelIsWorking = true;
 
 
 /********* FUNCTIONS ************/
@@ -1517,31 +1516,30 @@ STA_record::UnsetAssoc (std::string context, Mac48Address AP_MAC_address)
 
         if (staRecordVerboseLevel > 0)
           std::cout << Simulator::Now () 
-                    << "\t[UnsetAssoc] Channel in STA #" << staid 
-                    << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
-                    << "\twith MAC " << apMac
-                    << "\tset to " << newChannel 
-                    << std::endl;
+                    << "\t[UnsetAssoc] STA #" << staid 
+                    << " de-associated from AP #" << GetAnAP_Id(myaddress) 
+                    << ". Channel set to " << uint16_t (newChannel) 
+                    << ", i.e. the channel of the nearest AP (AP #" << (nearest)->GetId()
+                    << ")" << std::endl << std::endl;
+
       //}
     } else { // numChannels == 1
       if (staRecordVerboseLevel > 0)
         std::cout << Simulator::Now () 
-                  << "\t[UnsetAssoc] Channel in STA #" << staid 
-                  << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
-                  << "\twith MAC " << apMac
+                  << "\t[UnsetAssoc] STA #" << staid 
+                  << " de-associated from AP #" << GetAnAP_Id(myaddress) 
                   << "\tnot modified because numChannels=" << staRecordNumChannels 
                   << "\tchannel is still " << uint16_t (apChannel) 
-                  << std::endl;
+                  << std::endl << std::endl;
     }
   } else { // wifiModel = 1
     if (staRecordVerboseLevel > 0)
       std::cout << Simulator::Now () 
-                  << "\t[UnsetAssoc] Channel in STA #" << staid 
-                  << ", de-associated from AP #" << GetAnAP_Id(myaddress) 
-                  << "\twith MAC " << apMac
+                  << "\t[UnsetAssoc] STA #" << staid 
+                  << " de-associated from AP #" << GetAnAP_Id(myaddress) 
                   << "\tnot modified because wifimodel=" << staRecordwifiModel
                   << "\tchannel is still " << uint16_t (apChannel) 
-                  << std::endl;
+                  << std::endl << std::endl;
   }
 }
 
@@ -1761,6 +1759,8 @@ int main (int argc, char *argv[]) {
 
   uint32_t version80211 = 0; // 0 means 802.11n; 1 means 802.11ac
 
+  uint32_t errorRateModel = 0; // 0 means NistErrorRateModel (default); 1 means YansErrorRateModel
+
   uint32_t maxAmpduSize;     // taken from https://www.nsnam.org/doxygen/minstrel-ht-wifi-manager-example_8cc_source.html
 
   // Assign the selected value of the MAX AMPDU
@@ -1781,7 +1781,7 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("distance_between_STAs", "Initial distance in meters between the STAs (only for static and linear mobility)", distance_between_STAs);
 
   cmd.AddValue ("nodeMobility", "Kind of movement of the nodes (0 static; 1 linear; 2 Random Walk 2d; 3 Random Waypoint)", nodeMobility);
-  cmd.AddValue ("constantSpeed", "Speed of the nodes (in linear and random mobility)", constantSpeed);
+  cmd.AddValue ("constantSpeed", "Speed of the nodes (in linear and random mobility), default 1.5 m/s", constantSpeed);
 
   cmd.AddValue ("rateAPsWithAMPDUenabled", "Initial rate of APs with AMPDU aggregation enabled", rateAPsWithAMPDUenabled);
   cmd.AddValue ("aggregationAlgorithm", "Is the algorithm controlling AMPDU aggregation enabled?", aggregationAlgorithm);
@@ -1802,7 +1802,8 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("version80211", "Version of 802.11 (0: 802.11n; 1: 802.11ac)", version80211);
   cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
-  cmd.AddValue ("wifiModel", "WiFi model: 0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel (DO NOT USE OPTION 1)", wifiModel); // FIXME
+  cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy", wifiModel);
+  cmd.AddValue ("errorRateModel", "Error Rate model: 0: NistErrorRateModel (default); 1: YansErrorRateModel", errorRateModel);
 
   cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
 //cmd.AddValue ("enableRtsCts", "Enable RTS/CTS? 0: no (default); 1: yes; 2: only for packets above 500 bytes", enableRtsCts);
@@ -1818,7 +1819,7 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("outputFileSurname", "Other characters to be used in the name of the output files (not in the average one)", outputFileSurname);
   cmd.AddValue ("saveXMLFile", "Save per-flow results to an XML file?", saveXMLFile);
 
-  cmd.AddValue ("topology", "Topology: (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router)", topology);
+  cmd.AddValue ("topology", "Topology: (0: all server applications in a server; 1: all the servers connected to the hub (default); 2: all the servers behind a router)", topology);
 
   cmd.Parse (argc, argv);
 
@@ -1941,28 +1942,27 @@ int main (int argc, char *argv[]) {
     std::cout << "Number of APs per row: " << number_of_APs_per_row << '\n'; 
     std::cout << "Distance between APs: " << distance_between_APs << " meters" << '\n';
     std::cout << "Distance between the AP and the border of the scenario: " << distanceToBorder << " meters" << '\n';
-    //std::cout << '\n';  
     std::cout << "Total number of STAs: " << number_of_STAs << '\n'; 
     std::cout << "Number of STAs per row: " << number_of_STAs_per_row << '\n';
     std::cout << "Initial distance between STAs (only for static and linear mobility): " << distance_between_STAs << " meters" << '\n';
-    //std::cout << '\n'; 
     std::cout << "Node mobility (0 static; 1 linear; 2 Random Walk 2d; 3 Random Waypoint): " << nodeMobility << '\n';
-    std::cout << "Speed of the nodes (in linear and random mobility): " << constantSpeed << " meters/sec"<< '\n';
-    //std::cout << '\n'; 
+    std::cout << "Speed of the nodes (in linear and random mobility): " << constantSpeed << " m/s"<< '\n';
+    std::cout << "Topology (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router): " << topology << '\n';
+    std::cout << '\n';
     std::cout << "Initial rate of APs with AMPDU aggregation enabled: " << rateAPsWithAMPDUenabled << '\n';
     std::cout << "Is the algorithm controlling AMPDU aggregation enabled?: " << aggregationAlgorithm << '\n';
     std::cout << "Maximum value of the AMPDU size: " << maxAmpduSize << " bytes" << '\n';
     std::cout << "Maximum value of the AMPDU size when aggregation is disabled: " << maxAmpduSizeWhenAggregationDisabled << " bytes" << '\n';
-    //std::cout << '\n'; 
+    std::cout << '\n'; 
     std::cout << "TCP Payload size: " << TcpPayloadSize << " bytes"  << '\n';
     std::cout << "TCP variant: " << TcpVariant << '\n';
     std::cout << "Simulation Time: " << simulationTime <<" sec" << '\n';
-    //std::cout << '\n'; 
+    std::cout << '\n'; 
     std::cout << "Number of nodes running VoIP up: " << numberVoIPupload << '\n';
     std::cout << "Number of nodes running VoIP down: " << numberVoIPdownload << '\n';
     std::cout << "Number of nodes running TCP up: " << numberTCPupload << '\n';
     std::cout << "Number of nodes running TCP down: " << numberTCPdownload << '\n';
-    std::cout << "Use different 802.11 priorities for VoIP / TCP? (0: no, default; 1: yes): " << prioritiesEnabled << '\n';
+    std::cout << "Use different 802.11 priorities for VoIP / TCP? (0: no; 1: yes): " << prioritiesEnabled << '\n';
     //std::cout << '\n'; 
     std::cout << "Version of 802.11 (0: 802.11n; 1: 802.11ac): " << version80211 << '\n';
     std::cout << "Number of different channels to use on the APs: " << numChannels << '\n';
@@ -1972,12 +1972,13 @@ int main (int argc, char *argv[]) {
     }
     std::cout << '\n'; 
     std::cout << "Width of the wireless channels: " << channelWidth << '\n';
-    std::cout << "WiFi model (0: ns3::YansWifiPhy; 1: ns3::SpectrumWifiPhy with ns3::YansErrorRateModel): " << wifiModel << '\n';
-    //std::cout << '\n';
-    std::cout << "Model for 802.11 rate control (Constant; Ideal (default); Minstrel): " << rateModel << '\n';  
+    std::cout << "WiFi model (0: YansWifiPhy; 1: SpectrumWifiPhy): " << wifiModel << '\n';
+    std::cout << "Error Rate model: 0: NistErrorRateModel; 1: YansErrorRateModel: " << errorRateModel << '\n';
+    std::cout << '\n';
+    std::cout << "Model for 802.11 rate control (Constant; Ideal; Minstrel): " << rateModel << '\n';  
     std::cout << "Threshold for using RTS/CTS (Examples. 0:always; 500:only 500 bytes-packes or higher will require RTS/CTS; 999999:never): " << RtsCtsThreshold << " bytes" << '\n';
     std::cout << "Power level of the wireless interfaces (ranges between 0 and 1): " << powerLevel << '\n';
-    //std::cout << '\n';
+    std::cout << '\n';
     std::cout << "pcap generation enabled ?: " << enablePcap << '\n';
     std::cout << "verbose level: " << verboseLevel << '\n';
     std::cout << "Periodically print simulation time every " << printSeconds << " seconds" << '\n';    
@@ -1985,19 +1986,7 @@ int main (int argc, char *argv[]) {
     std::cout << "First characters to be used in the name of the output file: " << outputFileName << '\n';
     std::cout << "Other characters to be used in the name of the output file (not in the average one): " << outputFileSurname << '\n';
     std::cout << "Save per-flow results to an XML file?: " << saveXMLFile << '\n';
-    //std::cout << '\n'; 
-    std::cout << "Topology (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router): " << topology << '\n';
-
-    //std::cout << '\n'; 
-    std::cout << '\n';
-
-
-    //FIXME
-    if (wifiModel == 1 && numChannels > 1) {
-      AddOperationalChannelIsWorking = true;
-      std::cout << "####### the function AddOperationalChannel is working" << '\n'; 
-      std::cout << '\n';      
-    }
+    std::cout << '\n'; 
   }
 
 
@@ -2401,10 +2390,17 @@ int main (int argc, char *argv[]) {
     }
     wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
 
-    //FIXME: Can this be done with YANS?
+    if (errorRateModel == 0) { // Nist
+      wifiPhy.SetErrorRateModel ("ns3::NistErrorRateModel");
+    } else { // errorRateModel == 1 (Yans)
+      wifiPhy.SetErrorRateModel ("ns3::YansErrorRateModel");      
+    }
+
+
+/*     //FIXME: Can this be done with YANS?
 
     //Ptr<wifiPhy> myphy = node->GetObject<wifiPhy> ();
-/*    if (numChannels > 1) 
+    if (numChannels > 1) 
       for (uint32_t k = 0; k < numChannels; k++)
         wifiPhy.AddOperationalChannel ( availableChannels[k] );
 */
@@ -2423,7 +2419,12 @@ int main (int argc, char *argv[]) {
     spectrumChannel->SetPropagationDelayModel (delayModel);
 
     spectrumPhy.SetChannel (spectrumChannel);
-    spectrumPhy.SetErrorRateModel ("ns3::YansErrorRateModel");
+    if (errorRateModel == 0) { //Nist
+      spectrumPhy.SetErrorRateModel ("ns3::NistErrorRateModel");
+    } else { // errorRateModel == 1 (Yans)
+      spectrumPhy.SetErrorRateModel ("ns3::YansErrorRateModel");      
+    }
+
     //spectrumPhy.Set ("Frequency", UintegerValue (5180));
     //spectrumPhy.Set ("ChannelNumber", UintegerValue (ChannelNo)); //This is done later
     spectrumPhy.Set ("TxPowerStart", DoubleValue (1)); // dBm  (1.26 mW)
@@ -2442,10 +2443,10 @@ int main (int argc, char *argv[]) {
 
     // https://groups.google.com/forum/#!topic/ns-3-users/Ih8Hgs2qgeg
 
-    // This does not work, i.e. the STA does not scan in other channels
+/*    // This does not work, i.e. the STA does not scan in other channels
     if (numChannels > 1) 
       for (uint32_t k = 0; k < numChannels; k++)
-        (*m_phy).AddOperationalChannel ( availableChannels[k] );
+        (*m_phy).AddOperationalChannel ( availableChannels[k] );*/
   }
 
 
@@ -2653,7 +2654,7 @@ int main (int argc, char *argv[]) {
   Ssid stassid; // If you leave it blank, the STAs will send broadcast assoc requests
 
   // connect the STAs to the wifi channel
-  for (j=0; j < number_of_STAs; j++) {
+  for (uint32_t j = 0; j < number_of_STAs; j++) {
 
     // I use an auxiliary device container and an auxiliary interface container
     NetDeviceContainer staDev;
@@ -2743,9 +2744,8 @@ int main (int argc, char *argv[]) {
       spectrumPhy.Set ("ChannelNumber", UintegerValue(ChannelNoForThisSTA));
       //AP_vector[i]->setWirelessChannel(ChannelNoForThisAP);
 
-      staDev = wifi.Install (spectrumPhy, wifiMac, staNodes.Get(j));
+      staDev = wifi.Install (spectrumPhy, wifiMac, staNodes.Get(j));   
     }
-
 
     // add this device
     staDevices.push_back (staDev);
@@ -2775,9 +2775,29 @@ int main (int argc, char *argv[]) {
     }
   }
 
+
+
+  // EXPERIMENTAL: on each STA, add support for other operational channels
+  // This is only needed if more than 1 channel is in use, and if wifiModel == 1
+  if (numChannels > 1 && wifiModel == 1) {
+    Ptr<SpectrumWifiPhy> wifiPhyPtrClient;
+    for (uint32_t j = 0; j < number_of_STAs; j++) {
+      wifiPhyPtrClient = staDevices[j].Get(0)->GetObject<WifiNetDevice>()->GetPhy()->GetObject<SpectrumWifiPhy>();
+
+      std::cout << "STA\t#" << staNodes.Get(j)->GetId()
+                << "\tAdded operational channels: ";
+
+      for (uint32_t k = 0; k < numChannels; k++) {
+        (*wifiPhyPtrClient).AddOperationalChannel ( availableChannels[k] );
+        std::cout << uint16_t(availableChannels[k]) << " "; 
+      }
+      std::cout << '\n'; 
+    }
+  }
+
+
   // Set channel width
   Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (channelWidth));
-
 
 
   // wired connections
@@ -2821,7 +2841,6 @@ int main (int argc, char *argv[]) {
     apCsmaDevices.Add (link.Get(0));
     csmaHubDevices.Add (link.Get(1));
   }
-
 
   if (topology == 0) {
     // install a csma channel between the singleServer and the bridge (csmaHubNode) node
