@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v143
+ * v144
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -1477,10 +1477,11 @@ STA_record::UnsetAssoc (std::string context, Mac48Address AP_MAC_address)
     ListAPs (staRecordVerboseLevel);
   }
 
-
+/*
   // If wifiModel==1, I don't need to manually change the channel. It will do it automatically
   // If wifiModel==0, I have to manually set the channel of the STA to that of the nearest AP
   if (staRecordwifiModel == 0) {  // staRecordwifiModel is the local version of the variable wifiModel
+*/
     // Put the STA in the channel of the nearest AP
     if (staRecordNumChannels > 1) {
       // Only for wifiModel = 0. With WifiModel = 1 it is supposed to scan for other APs in other channels 
@@ -1532,7 +1533,7 @@ STA_record::UnsetAssoc (std::string context, Mac48Address AP_MAC_address)
                   << "\tchannel is still " << uint16_t (apChannel) 
                   << std::endl << std::endl;
     }
-  } else { // wifiModel = 1
+/*  } else { // wifiModel = 1
     if (staRecordVerboseLevel > 0)
       std::cout << Simulator::Now () 
                   << "\t[UnsetAssoc] STA #" << staid 
@@ -1540,7 +1541,7 @@ STA_record::UnsetAssoc (std::string context, Mac48Address AP_MAC_address)
                   << "\tnot modified because wifimodel=" << staRecordwifiModel
                   << "\tchannel is still " << uint16_t (apChannel) 
                   << std::endl << std::endl;
-  }
+  }*/
 }
 
 
@@ -1759,6 +1760,8 @@ int main (int argc, char *argv[]) {
 
   uint32_t version80211 = 0; // 0 means 802.11n; 1 means 802.11ac
 
+  uint32_t propagationLossModel = 0; // 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel
+
   uint32_t errorRateModel = 0; // 0 means NistErrorRateModel (default); 1 means YansErrorRateModel
 
   uint32_t maxAmpduSize;     // taken from https://www.nsnam.org/doxygen/minstrel-ht-wifi-manager-example_8cc_source.html
@@ -1802,7 +1805,9 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("version80211", "Version of 802.11 (0: 802.11n; 1: 802.11ac)", version80211);
   cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
-  cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy", wifiModel);
+  cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy with MultiModelSpectrumChannel", wifiModel);
+  // Path loss exponent in LogDistancePropagationLossModel is 3 and in Friis it is supposed to be lower maybe 2.
+  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel", propagationLossModel);
   cmd.AddValue ("errorRateModel", "Error Rate model: 0: NistErrorRateModel (default); 1: YansErrorRateModel", errorRateModel);
 
   cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
@@ -1972,7 +1977,9 @@ int main (int argc, char *argv[]) {
     }
     std::cout << '\n'; 
     std::cout << "Width of the wireless channels: " << channelWidth << '\n';
-    std::cout << "WiFi model (0: YansWifiPhy; 1: SpectrumWifiPhy): " << wifiModel << '\n';
+    std::cout << "WiFi model (0: YansWifiPhy; 1: SpectrumWifiPhy with MultiModelSpectrumChannel): " << wifiModel << '\n';
+    std::cout << "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel: " << propagationLossModel << '\n';
+
     std::cout << "Error Rate model: 0: NistErrorRateModel; 1: YansErrorRateModel: " << errorRateModel << '\n';
     std::cout << '\n';
     std::cout << "Model for 802.11 rate control (Constant; Ideal; Minstrel): " << rateModel << '\n';  
@@ -2363,31 +2370,28 @@ int main (int argc, char *argv[]) {
 
   if (wifiModel == 0) {
 
-    // Default configuration. The other one is better, as you can adjust things
-    if (false) {
-      // Create a channel helper and phy helper, and then create the channel
-      YansWifiChannelHelper wifiChannel = YansWifiChannelHelper::Default ();
-      //YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default ();
-      wifiPhy.SetChannel (wifiChannel.Create ());
+    wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
+    YansWifiChannelHelper wifiChannel;
 
-    // A more complex configuration
+    // propagation models: https://www.nsnam.org/doxygen/group__propagation.html
+    if (propagationLossModel == 0) {
+      wifiChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel");
     } else {
-      wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
-      YansWifiChannelHelper wifiChannel;
-      // propagation models: https://www.nsnam.org/doxygen/group__propagation.html
       wifiChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
-      wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
-
-      wifiPhy.SetChannel (wifiChannel.Create ());
-      wifiPhy.Set ("TxPowerStart", DoubleValue (powerLevel)); // a value of '1' means dBm (1.26 mW)
-      wifiPhy.Set ("TxPowerEnd", DoubleValue (powerLevel));
-      // Experiences:   at 5GHz,  with '-15' the coverage is less than 70 m
-      //                          with '-10' the coverage is about 70 m (recommended for an array with distance 50m between APs)
-
-      wifiPhy.Set ("ShortGuardEnabled", BooleanValue (false));
-      wifiPhy.Set ("ChannelWidth", UintegerValue (channelWidth));
-    //wifiPhy.Set ("ChannelNumber", UintegerValue(ChannelNo)); //This is done later
     }
+
+    wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
+
+    wifiPhy.SetChannel (wifiChannel.Create ());
+    wifiPhy.Set ("TxPowerStart", DoubleValue (powerLevel)); // a value of '1' means dBm (1.26 mW)
+    wifiPhy.Set ("TxPowerEnd", DoubleValue (powerLevel));
+    // Experiences:   at 5GHz,  with '-15' the coverage is less than 70 m
+    //                          with '-10' the coverage is about 70 m (recommended for an array with distance 50m between APs)
+
+    wifiPhy.Set ("ShortGuardEnabled", BooleanValue (false));
+    wifiPhy.Set ("ChannelWidth", UintegerValue (channelWidth));
+    //wifiPhy.Set ("ChannelNumber", UintegerValue(ChannelNo)); //This is done later
+
     wifiPhy.SetPcapDataLinkType (YansWifiPhyHelper::DLT_IEEE802_11_RADIO);
 
     if (errorRateModel == 0) { // Nist
@@ -2395,7 +2399,6 @@ int main (int argc, char *argv[]) {
     } else { // errorRateModel == 1 (Yans)
       wifiPhy.SetErrorRateModel ("ns3::YansErrorRateModel");      
     }
-
 
 /*     //FIXME: Can this be done with YANS?
 
@@ -2409,12 +2412,23 @@ int main (int argc, char *argv[]) {
   } else {
 
     //Bug 2460: CcaMode1Threshold default should be set to -62 dBm when using Spectrum
-    Config::SetDefault ("ns3::WifiPhy::CcaMode1Threshold", DoubleValue (-62.0));
+    //Config::SetDefault ("ns3::WifiPhy::CcaMode1Threshold", DoubleValue (-62.0));
 
+    // Use multimodel spectrum channel, https://www.nsnam.org/doxygen/classns3_1_1_multi_model_spectrum_channel.html
     Ptr<MultiModelSpectrumChannel> spectrumChannel = CreateObject<MultiModelSpectrumChannel> ();
-    Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
-    spectrumChannel->AddPropagationLossModel (lossModel);
 
+    // propagation models: https://www.nsnam.org/doxygen/group__propagation.html
+    if (propagationLossModel == 0) {
+      //spectrumChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel");
+      Ptr<LogDistancePropagationLossModel> lossModel = CreateObject<LogDistancePropagationLossModel> ();
+      spectrumChannel->AddPropagationLossModel (lossModel);
+    } else {
+      //spectrumChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
+      Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
+      spectrumChannel->AddPropagationLossModel (lossModel);
+    }
+
+    // delay model
     Ptr<ConstantSpeedPropagationDelayModel> delayModel = CreateObject<ConstantSpeedPropagationDelayModel> ();
     spectrumChannel->SetPropagationDelayModel (delayModel);
 
@@ -2425,10 +2439,11 @@ int main (int argc, char *argv[]) {
       spectrumPhy.SetErrorRateModel ("ns3::YansErrorRateModel");      
     }
 
+
     //spectrumPhy.Set ("Frequency", UintegerValue (5180));
     //spectrumPhy.Set ("ChannelNumber", UintegerValue (ChannelNo)); //This is done later
-    spectrumPhy.Set ("TxPowerStart", DoubleValue (1)); // dBm  (1.26 mW)
-    spectrumPhy.Set ("TxPowerEnd", DoubleValue (1));
+    spectrumPhy.Set ("TxPowerStart", DoubleValue (powerLevel));
+    spectrumPhy.Set ("TxPowerEnd", DoubleValue (powerLevel));
 
     spectrumPhy.Set ("ShortGuardEnabled", BooleanValue (false));
     spectrumPhy.Set ("ChannelWidth", UintegerValue (channelWidth));
@@ -2545,7 +2560,7 @@ int main (int argc, char *argv[]) {
       // Enable AMPDU
       wifiMac.SetType ( "ns3::ApWifiMac",
                         "Ssid", SsidValue (apssid),
-                        //"QosSupported", BooleanValue (true), // FIXME: check if this is important
+                        "QosSupported", BooleanValue (true), // FIXME: check if this is important
                         "BeaconGeneration", BooleanValue (true),  // Beacon generation is necessary in an AP
                         "BE_MaxAmpduSize", UintegerValue (maxAmpduSize),
                         "BK_MaxAmpduSize", UintegerValue (maxAmpduSize),
@@ -2560,7 +2575,7 @@ int main (int argc, char *argv[]) {
       // - don't use aggregation (both A-MPDU and A-MSDU are disabled);
       wifiMac.SetType ( "ns3::ApWifiMac",
                         "Ssid", SsidValue (apssid),
-                        //"QosSupported", BooleanValue (true),    // FIXME: check if this is important
+                        "QosSupported", BooleanValue (true),    // FIXME: check if this is important
                         "BeaconGeneration", BooleanValue (true),  // Beacon generation is necessary in an AP
                         "BE_MaxAmpduSize", UintegerValue (0),     //Disable A-MPDU
                         "BK_MaxAmpduSize", UintegerValue (0),     //Disable A-MPDU
@@ -2673,8 +2688,8 @@ int main (int argc, char *argv[]) {
       if ( j < numberVoIPupload + numberVoIPdownload ) {
         wifiMac.SetType ( "ns3::StaWifiMac",
                           "Ssid", SsidValue (stassid),
-                          //"QosSupported", BooleanValue (true),
-                          //"ActiveProbing", BooleanValue (false),
+                          "QosSupported", BooleanValue (true),
+                          "ActiveProbing", BooleanValue (true),
                           "BE_MaxAmpduSize", UintegerValue (0),
                           "BK_MaxAmpduSize", UintegerValue (0),
                           "VI_MaxAmpduSize", UintegerValue (0),
@@ -2683,8 +2698,8 @@ int main (int argc, char *argv[]) {
       } else {
         wifiMac.SetType ( "ns3::StaWifiMac",
                           "Ssid", SsidValue (stassid),
-                          //"QosSupported", BooleanValue (true),
-                          //"ActiveProbing", BooleanValue (false),
+                          "QosSupported", BooleanValue (true),
+                          "ActiveProbing", BooleanValue (true),
                           "BE_MaxAmpduSize", UintegerValue (maxAmpduSize),
                           "BK_MaxAmpduSize", UintegerValue (maxAmpduSize),
                           "VI_MaxAmpduSize", UintegerValue (maxAmpduSize),
