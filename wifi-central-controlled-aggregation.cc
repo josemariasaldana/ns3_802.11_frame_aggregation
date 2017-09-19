@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v144
+ * v145
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -1738,7 +1738,7 @@ int main (int argc, char *argv[]) {
 
   uint32_t RtsCtsThreshold = 999999;  // RTS/CTS is disabled by defalult
 
-  int powerLevel = 1;
+  double powerLevel = 30.0;  // in dBm
 
   std::string rateModel = "Ideal"; // Model for 802.11 rate control (Constant; Ideal; Minstrel)
 
@@ -1760,7 +1760,7 @@ int main (int argc, char *argv[]) {
 
   uint32_t version80211 = 0; // 0 means 802.11n; 1 means 802.11ac
 
-  uint32_t propagationLossModel = 0; // 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel
+  uint32_t propagationLossModel = 0; // 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel
 
   uint32_t errorRateModel = 0; // 0 means NistErrorRateModel (default); 1 means YansErrorRateModel
 
@@ -1807,13 +1807,13 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
   cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy with MultiModelSpectrumChannel", wifiModel);
   // Path loss exponent in LogDistancePropagationLossModel is 3 and in Friis it is supposed to be lower maybe 2.
-  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel", propagationLossModel);
+  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel (not working yet)", propagationLossModel);
   cmd.AddValue ("errorRateModel", "Error Rate model: 0: NistErrorRateModel (default); 1: YansErrorRateModel", errorRateModel);
 
   cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
 //cmd.AddValue ("enableRtsCts", "Enable RTS/CTS? 0: no (default); 1: yes; 2: only for packets above 500 bytes", enableRtsCts);
   cmd.AddValue ("RtsCtsThreshold", "Threshold for using RTS/CTS (bytes). Examples. 0: always; 500: only 500 bytes-packes or higher will require RTS/CTS; 999999: never (default)", RtsCtsThreshold);
-  cmd.AddValue ("powerLevel", "Power level of the wireless interfaces", powerLevel);
+  cmd.AddValue ("powerLevel", "Power level of the wireless interfaces (dBm, Default 30)", powerLevel);
 
   cmd.AddValue ("writeMobility", "Write mobility trace", writeMobility);
   cmd.AddValue ("enablePcap", "Enable/disable pcap file generation", enablePcap);
@@ -1978,13 +1978,13 @@ int main (int argc, char *argv[]) {
     std::cout << '\n'; 
     std::cout << "Width of the wireless channels: " << channelWidth << '\n';
     std::cout << "WiFi model (0: YansWifiPhy; 1: SpectrumWifiPhy with MultiModelSpectrumChannel): " << wifiModel << '\n';
-    std::cout << "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel: " << propagationLossModel << '\n';
+    std::cout << "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel: " << propagationLossModel << '\n';
 
     std::cout << "Error Rate model: 0: NistErrorRateModel; 1: YansErrorRateModel: " << errorRateModel << '\n';
     std::cout << '\n';
     std::cout << "Model for 802.11 rate control (Constant; Ideal; Minstrel): " << rateModel << '\n';  
     std::cout << "Threshold for using RTS/CTS (Examples. 0:always; 500:only 500 bytes-packes or higher will require RTS/CTS; 999999:never): " << RtsCtsThreshold << " bytes" << '\n';
-    std::cout << "Power level of the wireless interfaces (ranges between 0 and 1): " << powerLevel << '\n';
+    std::cout << "Power level of the wireless interfaces: " << powerLevel << " dBm" << '\n';
     std::cout << '\n';
     std::cout << "pcap generation enabled ?: " << enablePcap << '\n';
     std::cout << "verbose level: " << verboseLevel << '\n';
@@ -2376,14 +2376,14 @@ int main (int argc, char *argv[]) {
     // propagation models: https://www.nsnam.org/doxygen/group__propagation.html
     if (propagationLossModel == 0) {
       wifiChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel");
-    } else {
+    } else if (propagationLossModel == 1) {
       wifiChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
     }
 
     wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
 
     wifiPhy.SetChannel (wifiChannel.Create ());
-    wifiPhy.Set ("TxPowerStart", DoubleValue (powerLevel)); // a value of '1' means dBm (1.26 mW)
+    wifiPhy.Set ("TxPowerStart", DoubleValue (powerLevel)); // a value of '1' means 1 dBm (1.26 mW)
     wifiPhy.Set ("TxPowerEnd", DoubleValue (powerLevel));
     // Experiences:   at 5GHz,  with '-15' the coverage is less than 70 m
     //                          with '-10' the coverage is about 70 m (recommended for an array with distance 50m between APs)
@@ -2422,10 +2422,14 @@ int main (int argc, char *argv[]) {
       //spectrumChannel.AddPropagationLoss ("ns3::LogDistancePropagationLossModel");
       Ptr<LogDistancePropagationLossModel> lossModel = CreateObject<LogDistancePropagationLossModel> ();
       spectrumChannel->AddPropagationLossModel (lossModel);
-    } else {
+    } else if (propagationLossModel == 1) {
       //spectrumChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
       Ptr<FriisPropagationLossModel> lossModel = CreateObject<FriisPropagationLossModel> ();
       spectrumChannel->AddPropagationLossModel (lossModel);
+    } else if (propagationLossModel == 2) {
+      //spectrumChannel.AddPropagationLoss ("ns3::FriisSpectrumPropagationLossModel");
+      Ptr<FriisSpectrumPropagationLossModel> lossModel = CreateObject<FriisSpectrumPropagationLossModel> ();
+//      spectrumChannel->AddPropagationLossModel (lossModel);
     }
 
     // delay model
@@ -2442,7 +2446,7 @@ int main (int argc, char *argv[]) {
 
     //spectrumPhy.Set ("Frequency", UintegerValue (5180));
     //spectrumPhy.Set ("ChannelNumber", UintegerValue (ChannelNo)); //This is done later
-    spectrumPhy.Set ("TxPowerStart", DoubleValue (powerLevel));
+    spectrumPhy.Set ("TxPowerStart", DoubleValue (powerLevel));  // a value of '1' means 1 dBm (1.26 mW)
     spectrumPhy.Set ("TxPowerEnd", DoubleValue (powerLevel));
 
     spectrumPhy.Set ("ShortGuardEnabled", BooleanValue (false));
