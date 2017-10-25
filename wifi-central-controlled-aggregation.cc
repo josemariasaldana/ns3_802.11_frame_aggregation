@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v145
+ * v146
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -1808,7 +1808,7 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
   cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy with MultiModelSpectrumChannel", wifiModel);
   // Path loss exponent in LogDistancePropagationLossModel is 3 and in Friis it is supposed to be lower maybe 2.
-  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel (not working yet)", propagationLossModel);
+  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel", propagationLossModel);
   cmd.AddValue ("errorRateModel", "Error Rate model: 0: NistErrorRateModel (default); 1: YansErrorRateModel", errorRateModel);
 
   cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
@@ -2430,7 +2430,7 @@ int main (int argc, char *argv[]) {
     } else if (propagationLossModel == 2) {
       //spectrumChannel.AddPropagationLoss ("ns3::FriisSpectrumPropagationLossModel");
       Ptr<FriisSpectrumPropagationLossModel> lossModel = CreateObject<FriisSpectrumPropagationLossModel> ();
-      spectrumChannel->AddSpectrumPropagationLossModel(lossModel);
+      spectrumChannel->AddSpectrumPropagationLossModel (lossModel);
     }
 
     // delay model
