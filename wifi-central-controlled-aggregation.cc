@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v146
+ * v147
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -1776,6 +1776,15 @@ int main (int argc, char *argv[]) {
 
   // declaring the command line parser (input parameters)
   CommandLine cmd;
+
+  // General scenario topology parameters
+  cmd.AddValue ("simulationTime", "Simulation time in seconds", simulationTime);
+
+  cmd.AddValue ("numberVoIPupload", "Number of nodes running VoIP up", numberVoIPupload);
+  cmd.AddValue ("numberVoIPdownload", "Number of nodes running VoIP down", numberVoIPdownload);
+  cmd.AddValue ("numberTCPupload", "Number of nodes running TCP up", numberTCPupload);
+  cmd.AddValue ("numberTCPdownload", "Number of nodes running TCP down", numberTCPdownload);
+
   cmd.AddValue ("number_of_APs", "Number of wifi APs", number_of_APs);
   cmd.AddValue ("number_of_APs_per_row", "Number of wifi APs per row", number_of_APs_per_row);
   cmd.AddValue ("distance_between_APs", "Distance in meters between the APs", distance_between_APs);
@@ -1784,38 +1793,37 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("number_of_STAs_per_row", "Number of wifi STAs per row", number_of_STAs_per_row);
   cmd.AddValue ("distance_between_STAs", "Initial distance in meters between the STAs (only for static and linear mobility)", distance_between_STAs);
 
-  cmd.AddValue ("nodeMobility", "Kind of movement of the nodes (0 static; 1 linear; 2 Random Walk 2d; 3 Random Waypoint)", nodeMobility);
+  cmd.AddValue ("nodeMobility", "Kind of movement of the nodes: '0' static (default); '1' linear; '2' Random Walk 2d; '3' Random Waypoint", nodeMobility);
   cmd.AddValue ("constantSpeed", "Speed of the nodes (in linear and random mobility), default 1.5 m/s", constantSpeed);
 
+  cmd.AddValue ("topology", "Topology: '0' all server applications in a server; '1' all the servers connected to the hub (default); '2' all the servers behind a router", topology);
+
+  // Aggregation parameters
   cmd.AddValue ("rateAPsWithAMPDUenabled", "Initial rate of APs with AMPDU aggregation enabled", rateAPsWithAMPDUenabled);
   cmd.AddValue ("aggregationAlgorithm", "Is the algorithm controlling AMPDU aggregation enabled?", aggregationAlgorithm);
   cmd.AddValue ("maxAmpduSize", "Maximum value of the AMPDU (bytes)", maxAmpduSize);
   cmd.AddValue ("maxAmpduSizeWhenAggregationDisabled", "Max AMPDU size to use when aggregation is disabled", maxAmpduSizeWhenAggregationDisabled);
 
+  // TCP parameters
   cmd.AddValue ("TcpPayloadSize", "Payload size in bytes", TcpPayloadSize);
   cmd.AddValue ("TcpVariant", "TCP variant: TcpNewReno (default), TcpHighSpped, TcpWestwoodPlus", TcpVariant);
 
-  cmd.AddValue ("simulationTime", "Simulation time in seconds", simulationTime);
-
-  cmd.AddValue ("numberVoIPupload", "Number of nodes running VoIP up", numberVoIPupload);
-  cmd.AddValue ("numberVoIPdownload", "Number of nodes running VoIP down", numberVoIPdownload);
-  cmd.AddValue ("numberTCPupload", "Number of nodes running TCP up", numberTCPupload);
-  cmd.AddValue ("numberTCPdownload", "Number of nodes running TCP down", numberTCPdownload);
-  cmd.AddValue ("prioritiesEnabled", "Use different 802.11 priorities for VoIP / TCP (0: no, default; 1: yes)", prioritiesEnabled);
-
-  cmd.AddValue ("version80211", "Version of 802.11 (0: 802.11n; 1: 802.11ac)", version80211);
+  // 802.11 priorities, version, channels
+  cmd.AddValue ("prioritiesEnabled", "Use different 802.11 priorities for VoIP / TCP: '0' no (default); '1' yes", prioritiesEnabled);
+  cmd.AddValue ("version80211", "Version of 802.11: '0' 802.11n (default); '1' 802.11ac", version80211);
   cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
-  cmd.AddValue ("wifiModel", "WiFi model: 0: YansWifiPhy (default); 1: SpectrumWifiPhy with MultiModelSpectrumChannel", wifiModel);
+  cmd.AddValue ("rateModel", "Model for 802.11 rate control: 'Constant'; 'Ideal'; 'Minstrel')", rateModel);  
+  cmd.AddValue ("RtsCtsThreshold", "Threshold for using RTS/CTS (bytes). Examples: '0' always; '500' only 500 bytes-packes or higher will require RTS/CTS; '999999' never (default)", RtsCtsThreshold);
+
+  // Wi-Fi power, propagation and error models
+  cmd.AddValue ("powerLevel", "Power level of the wireless interfaces (dBm), default 30", powerLevel);
+  cmd.AddValue ("wifiModel", "WiFi model: '0' YansWifiPhy (default); '1' SpectrumWifiPhy with MultiModelSpectrumChannel", wifiModel);
   // Path loss exponent in LogDistancePropagationLossModel is 3 and in Friis it is supposed to be lower maybe 2.
-  cmd.AddValue ("propagationLossModel", "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel", propagationLossModel);
-  cmd.AddValue ("errorRateModel", "Error Rate model: 0: NistErrorRateModel (default); 1: YansErrorRateModel", errorRateModel);
+  cmd.AddValue ("propagationLossModel", "Propagation loss model: '0' LogDistancePropagationLossModel (default); '1' FriisPropagationLossModel; '2' FriisSpectrumPropagationLossModel", propagationLossModel);
+  cmd.AddValue ("errorRateModel", "Error Rate model: '0' NistErrorRateModel (default); '1' YansErrorRateModel", errorRateModel);
 
-  cmd.AddValue ("rateModel", "Model for 802.11 rate control (Constant; Ideal; Minstrel)", rateModel);  
-//cmd.AddValue ("enableRtsCts", "Enable RTS/CTS? 0: no (default); 1: yes; 2: only for packets above 500 bytes", enableRtsCts);
-  cmd.AddValue ("RtsCtsThreshold", "Threshold for using RTS/CTS (bytes). Examples. 0: always; 500: only 500 bytes-packes or higher will require RTS/CTS; 999999: never (default)", RtsCtsThreshold);
-  cmd.AddValue ("powerLevel", "Power level of the wireless interfaces (dBm, Default 30)", powerLevel);
-
+  // Parameters of the output of the program
   cmd.AddValue ("writeMobility", "Write mobility trace", writeMobility);
   cmd.AddValue ("enablePcap", "Enable/disable pcap file generation", enablePcap);
   cmd.AddValue ("verboseLevel", "Tell echo applications to log if true", verboseLevel);
@@ -1824,8 +1832,6 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("outputFileName", "First characters to be used in the name of the output files", outputFileName);
   cmd.AddValue ("outputFileSurname", "Other characters to be used in the name of the output files (not in the average one)", outputFileSurname);
   cmd.AddValue ("saveXMLFile", "Save per-flow results to an XML file?", saveXMLFile);
-
-  cmd.AddValue ("topology", "Topology: (0: all server applications in a server; 1: all the servers connected to the hub (default); 2: all the servers behind a router)", topology);
 
   cmd.Parse (argc, argv);
 
@@ -1944,6 +1950,13 @@ int main (int argc, char *argv[]) {
     LogComponentEnable("SimpleMpduAggregation", LOG_LEVEL_INFO);
 
     // write the input parameters to the screen
+
+    // General scenario topology parameters
+    std::cout << "Simulation Time: " << simulationTime <<" sec" << '\n';
+    std::cout << "Number of nodes running VoIP up: " << numberVoIPupload << '\n';
+    std::cout << "Number of nodes running VoIP down: " << numberVoIPdownload << '\n';
+    std::cout << "Number of nodes running TCP up: " << numberTCPupload << '\n';
+    std::cout << "Number of nodes running TCP down: " << numberTCPdownload << '\n';
     std::cout << "Number of APs: " << number_of_APs << '\n';    
     std::cout << "Number of APs per row: " << number_of_APs_per_row << '\n'; 
     std::cout << "Distance between APs: " << distance_between_APs << " meters" << '\n';
@@ -1951,42 +1964,40 @@ int main (int argc, char *argv[]) {
     std::cout << "Total number of STAs: " << number_of_STAs << '\n'; 
     std::cout << "Number of STAs per row: " << number_of_STAs_per_row << '\n';
     std::cout << "Initial distance between STAs (only for static and linear mobility): " << distance_between_STAs << " meters" << '\n';
-    std::cout << "Node mobility (0 static; 1 linear; 2 Random Walk 2d; 3 Random Waypoint): " << nodeMobility << '\n';
+    std::cout << "Node mobility: '0' static; '1' linear; '2' Random Walk 2d; '3' Random Waypoint: " << nodeMobility << '\n';
     std::cout << "Speed of the nodes (in linear and random mobility): " << constantSpeed << " m/s"<< '\n';
-    std::cout << "Topology (0: all server applications in a server; 1: all the servers connected to the hub; 2: all the servers behind a router): " << topology << '\n';
+    std::cout << "Topology: '0' all server applications in a server; '1' all the servers connected to the hub; '2' all the servers behind a router: " << topology << '\n';
     std::cout << '\n';
+    // Aggregation parameters    
     std::cout << "Initial rate of APs with AMPDU aggregation enabled: " << rateAPsWithAMPDUenabled << '\n';
     std::cout << "Is the algorithm controlling AMPDU aggregation enabled?: " << aggregationAlgorithm << '\n';
     std::cout << "Maximum value of the AMPDU size: " << maxAmpduSize << " bytes" << '\n';
     std::cout << "Maximum value of the AMPDU size when aggregation is disabled: " << maxAmpduSizeWhenAggregationDisabled << " bytes" << '\n';
-    std::cout << '\n'; 
+    std::cout << '\n';
+    // TCP parameters
     std::cout << "TCP Payload size: " << TcpPayloadSize << " bytes"  << '\n';
     std::cout << "TCP variant: " << TcpVariant << '\n';
-    std::cout << "Simulation Time: " << simulationTime <<" sec" << '\n';
-    std::cout << '\n'; 
-    std::cout << "Number of nodes running VoIP up: " << numberVoIPupload << '\n';
-    std::cout << "Number of nodes running VoIP down: " << numberVoIPdownload << '\n';
-    std::cout << "Number of nodes running TCP up: " << numberTCPupload << '\n';
-    std::cout << "Number of nodes running TCP down: " << numberTCPdownload << '\n';
-    std::cout << "Use different 802.11 priorities for VoIP / TCP? (0: no; 1: yes): " << prioritiesEnabled << '\n';
-    //std::cout << '\n'; 
-    std::cout << "Version of 802.11 (0: 802.11n; 1: 802.11ac): " << version80211 << '\n';
+    std::cout << '\n';
+    // 802.11 priorities, version, channels  
+    std::cout << "Use different 802.11 priorities for VoIP / TCP?: '0' no; '1' yes: " << prioritiesEnabled << '\n';
+    std::cout << "Version of 802.11 '0' 802.11n; '1' 802.11ac: " << version80211 << '\n';
     std::cout << "Number of different channels to use on the APs: " << numChannels << '\n';
     std::cout << "Channels being used: ";
     for (uint32_t i = 0; i < numChannels; ++i) {
       std::cout << uint16_t (availableChannels[i]) << " ";
     }
-    std::cout << '\n'; 
+    std::cout << '\n';
     std::cout << "Width of the wireless channels: " << channelWidth << '\n';
-    std::cout << "WiFi model (0: YansWifiPhy; 1: SpectrumWifiPhy with MultiModelSpectrumChannel): " << wifiModel << '\n';
-    std::cout << "Propagation loss model: 0: LogDistancePropagationLossModel (default); 1: FriisPropagationLossModel; 2: FriisSpectrumPropagationLossModel: " << propagationLossModel << '\n';
-
-    std::cout << "Error Rate model: 0: NistErrorRateModel; 1: YansErrorRateModel: " << errorRateModel << '\n';
+    std::cout << "Model for 802.11 rate control 'Constant'; 'Ideal'; 'Minstrel': " << rateModel << '\n';  
+    std::cout << "Threshold for using RTS/CTS. Examples. '0' always; '500' only 500 bytes-packes or higher will require RTS/CTS; '999999' never: " << RtsCtsThreshold << " bytes" << '\n';
     std::cout << '\n';
-    std::cout << "Model for 802.11 rate control (Constant; Ideal; Minstrel): " << rateModel << '\n';  
-    std::cout << "Threshold for using RTS/CTS (Examples. 0:always; 500:only 500 bytes-packes or higher will require RTS/CTS; 999999:never): " << RtsCtsThreshold << " bytes" << '\n';
+    // Wi-Fi power, propagation and error models  
     std::cout << "Power level of the wireless interfaces: " << powerLevel << " dBm" << '\n';
+    std::cout << "WiFi model: '0' YansWifiPhy; '1' SpectrumWifiPhy with MultiModelSpectrumChannel: " << wifiModel << '\n';
+    std::cout << "Propagation loss model: '0' LogDistancePropagationLossModel; '1' FriisPropagationLossModel; '2' FriisSpectrumPropagationLossModel: " << propagationLossModel << '\n';
+    std::cout << "Error Rate model: '0' NistErrorRateModel; '1' YansErrorRateModel: " << errorRateModel << '\n';
     std::cout << '\n';
+    // Parameters of the output of the program  
     std::cout << "pcap generation enabled ?: " << enablePcap << '\n';
     std::cout << "verbose level: " << verboseLevel << '\n';
     std::cout << "Periodically print simulation time every " << printSeconds << " seconds" << '\n';    
@@ -2565,7 +2576,7 @@ int main (int argc, char *argv[]) {
       // Enable AMPDU
       wifiMac.SetType ( "ns3::ApWifiMac",
                         "Ssid", SsidValue (apssid),
-                        "QosSupported", BooleanValue (true), // FIXME: check if this is important
+                        "QosSupported", BooleanValue (true),
                         "BeaconGeneration", BooleanValue (true),  // Beacon generation is necessary in an AP
                         "BE_MaxAmpduSize", UintegerValue (maxAmpduSize),
                         "BK_MaxAmpduSize", UintegerValue (maxAmpduSize),
@@ -2580,7 +2591,7 @@ int main (int argc, char *argv[]) {
       // - don't use aggregation (both A-MPDU and A-MSDU are disabled);
       wifiMac.SetType ( "ns3::ApWifiMac",
                         "Ssid", SsidValue (apssid),
-                        "QosSupported", BooleanValue (true),    // FIXME: check if this is important
+                        "QosSupported", BooleanValue (true),
                         "BeaconGeneration", BooleanValue (true),  // Beacon generation is necessary in an AP
                         "BE_MaxAmpduSize", UintegerValue (0),     //Disable A-MPDU
                         "BK_MaxAmpduSize", UintegerValue (0),     //Disable A-MPDU
