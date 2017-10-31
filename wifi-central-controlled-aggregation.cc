@@ -34,7 +34,7 @@
  * The association record is inspired on https://github.com/MOSAIC-UA/802.11ah-ns3/blob/master/ns-3/scratch/s1g-mac-test.cc
  * The hub is inspired on https://www.nsnam.org/doxygen/csma-bridge_8cc_source.html
  *
- * v147
+ * v148
  * Developed and tested for ns-3.26, although the simulation crashes in some cases. One example:
  *    - more than one AP
  *    - set the RtsCtsThreshold below 48000
@@ -1810,7 +1810,7 @@ int main (int argc, char *argv[]) {
 
   // 802.11 priorities, version, channels
   cmd.AddValue ("prioritiesEnabled", "Use different 802.11 priorities for VoIP / TCP: '0' no (default); '1' yes", prioritiesEnabled);
-  cmd.AddValue ("version80211", "Version of 802.11: '0' 802.11n (default); '1' 802.11ac", version80211);
+  cmd.AddValue ("version80211", "Version of 802.11: '0' 802.11n 5GHz (default); '1' 802.11ac; '2' 802.11n 2.4GHz", version80211);
   cmd.AddValue ("numChannels", "Number of different channels to use on the APs: 1, 4 (default), 9, 16", numChannels);
   cmd.AddValue ("channelWidth", "Width of the wireless channels: 20 (default), 40, 80, 160", channelWidth);
   cmd.AddValue ("rateModel", "Model for 802.11 rate control: 'Constant'; 'Ideal'; 'Minstrel')", rateModel);  
@@ -1931,6 +1931,12 @@ int main (int argc, char *argv[]) {
     return 0;    
   }
 
+  // LogDistancePropagationLossModel does not work properly in 2.4 GHz
+  if ((version80211 == 2 ) && (propagationLossModel == 0)) {
+    std::cout << "INPUT PARAMETER ERROR: LogDistancePropagationLossModel does not work properly in 2.4 GHz. Stopping the simulation." << '\n';
+    return 0;      
+  }
+
   uint8_t availableChannels[numChannels];
   for (uint32_t i = 0; i < numChannels; ++i) {
     if (channelWidth == 20)
@@ -1980,7 +1986,7 @@ int main (int argc, char *argv[]) {
     std::cout << '\n';
     // 802.11 priorities, version, channels  
     std::cout << "Use different 802.11 priorities for VoIP / TCP?: '0' no; '1' yes: " << prioritiesEnabled << '\n';
-    std::cout << "Version of 802.11 '0' 802.11n; '1' 802.11ac: " << version80211 << '\n';
+    std::cout << "Version of 802.11: '0' 802.11n 5GHz; '1' 802.11ac; '2' 802.11n 2.4GHz: " << version80211 << '\n';
     std::cout << "Number of different channels to use on the APs: " << numChannels << '\n';
     std::cout << "Channels being used: ";
     for (uint32_t i = 0; i < numChannels; ++i) {
@@ -2493,9 +2499,10 @@ int main (int argc, char *argv[]) {
   // define the standard to follow (see https://www.nsnam.org/doxygen/group__wifi.html#ga1299834f4e1c615af3ca738033b76a49)
   if (version80211 == 0) {
     wifi.SetStandard (WIFI_PHY_STANDARD_80211n_5GHZ);
-    //wifi.SetStandard (WIFI_PHY_STANDARD_80211n_2_4GHZ); // This is also valid
-  } else {
+  } else if (version80211 == 1) {
     wifi.SetStandard (WIFI_PHY_STANDARD_80211ac);
+  } else if (version80211 == 2) {
+    wifi.SetStandard (WIFI_PHY_STANDARD_80211n_2_4GHZ);
   }
 
 
