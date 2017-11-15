@@ -8,9 +8,8 @@
  *
  * Jose Saldana, Jose Ruiz-Mas, Jose Almodovar, "Frame Aggregation in Central Controlled
  * 802.11 WLANs: the Latency vs. Throughput Trade-off," IEEE Communications Letters,
- * accepted for publication, August 2017.
+ * vol.21, no. 2, pp. 2500-2530, Nov. 2017. ISSN 1089-7798.
  * http://dx.doi.org/10.1109/LCOMM.2017.2741940
- * FIXME: (the citation will be updated as soon as the paper is published in paper)
  *
  * http://ieeexplore.ieee.org/document/8013762/
  * Author's self-archive version: http://diec.unizar.es/~jsaldana/personal/amsterdam_2017_in_proc.pdf
